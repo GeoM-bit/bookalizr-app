@@ -4,10 +4,10 @@ import MapView, { Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { collection, getDocs, query, where, limit } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, setDoc,  query, where, limit } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 
-const MapContent = () => {
+const MapContent = ({navigation}) => {
   const [location, setLocation] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -15,6 +15,20 @@ const MapContent = () => {
   const [nearbyBooks, setNearbyBooks] = useState([]);
   const mapRef = useRef(null);
   const scrollViewRef = useRef(null);
+
+ const startChat = async (chatId, userEmail, otherEmail) => {
+  const chatRef = doc(db, 'chats', chatId);
+  const chatSnap = await getDoc(chatRef);
+
+  if (!chatSnap.exists()) {
+    await setDoc(chatRef, {
+      chatId,
+      participants: [userEmail, otherEmail],
+      createdAt: new Date(),
+    });
+  }
+};
+
 
 const getNearbyReadings = async (latitude, longitude, username) => {
   const radiusKm = 5.0;
@@ -56,7 +70,8 @@ const getNearbyReadings = async (latitude, longitude, username) => {
               publishedDate: book.year, 
               coverUrl: book.cover_url,
               latitude: reading.latitude,
-              longitude: reading.longitude
+              longitude: reading.longitude,
+               owner: reading.username
             });
           }
         }
@@ -232,7 +247,28 @@ function deg2rad(deg) {
               <View style={styles.textContainer}>
                 <Text style={styles.bookTitle}>{book.title}</Text>
                 <Text style={styles.bookAuthor}>{book.author}</Text>  
-                <Text style={styles.bookDetails}>{book.publisher}, {book.year}</Text>                            
+                <Text style={styles.bookDetails}>{book.publisher}, {book.year}</Text>       
+<TouchableOpacity
+  onPress={async () => {
+    const currentUser = await AsyncStorage.getItem('userEmail');
+    const chatId = [currentUser, book.owner].sort().join('_');
+
+    try {
+      await startChat(chatId, currentUser, book.owner);  // Create chat if missing
+      navigation.navigate('Chat', {
+        chatId,
+        recipient: book.owner,
+      });
+    } catch (error) {
+      console.log('Error starting chat:', error);
+    }
+  }}
+>
+  <Text>Chat with Reader</Text>
+</TouchableOpacity>
+
+
+                     
               </View>
             </View>
           </TouchableOpacity>
@@ -248,7 +284,7 @@ const HomeScreen = ({ navigation }) => {
               <View style={styles.header}>
               <Text style={styles.headerTitle}>Books in your area</Text>
             </View>
-      <MapContent/>
+      <MapContent navigation={navigation} />
       <View style={styles.bottomNav}>
         <TouchableOpacity 
           style={styles.navIcon}
@@ -277,6 +313,12 @@ const HomeScreen = ({ navigation }) => {
         >
           <Ionicons name="person-outline" size={28} color="#333" />
         </TouchableOpacity>
+        <TouchableOpacity 
+  style={styles.navIcon}
+  onPress={() => navigation.navigate('Chats')}
+>
+  <Ionicons name="chatbubble-outline" size={28} color="#333" />
+</TouchableOpacity>
       </View>
     </View>
   );

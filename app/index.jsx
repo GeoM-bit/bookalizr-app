@@ -9,6 +9,8 @@ import LoginScreen from './loginScreen';
 import RegisterScreen from './registerScreen';
 import MyLibraryScreen from './myLibraryScreen';
 import AccountScreen from './accountScreen';
+import ChatScreen from './chatScreen';
+import ChatsScreen from './chatsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -53,6 +55,15 @@ const App = () => {
           name="Account" 
           component={AccountScreen} 
           options={{ headerShown: false }}/>
+          <Stack.Screen 
+          name="Chat" 
+          component={ChatScreen}
+          options={{ headerShown: false }} />
+          <Stack.Screen 
+  name="Chats" 
+  component={ChatsScreen} 
+  options={{ headerShown: false }} 
+/>
         </Stack.Navigator>
       </NavigationContainer>
     </NavigationIndependentTree>
