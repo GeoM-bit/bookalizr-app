@@ -2,9 +2,10 @@ import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, StyleSheet
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker } from 'react-native-maps';
 import * as Location from 'expo-location';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect } from '@react-navigation/native'; 
+import { collection, getDocs, query, where, limit } from 'firebase/firestore';
+import { db } from './firebaseConfig';
 
 const MapContent = () => {
   const [location, setLocation] = useState(null);
@@ -14,6 +15,78 @@ const MapContent = () => {
   const [nearbyBooks, setNearbyBooks] = useState([]);
   const mapRef = useRef(null);
   const scrollViewRef = useRef(null);
+
+const getNearbyReadings = async (latitude, longitude, username) => {
+  const radiusKm = 5.0;
+  
+  try {
+    const readingsQuery = query(
+      collection(db, 'reading'),
+      where('isReading', '==', true),
+      //where('username', '!=', username)
+    );
+    
+    const readingsSnapshot = await getDocs(readingsQuery);
+    const nearbyReadings = [];
+    
+    for (const snap of readingsSnapshot.docs) {
+      const reading = snap.data();
+
+      try {
+        const readingLat = parseFloat(reading.latitude);
+        const readingLon = parseFloat(reading.longitude);
+        
+        const distance = distanceInKm(latitude, longitude, readingLat, readingLon);
+        if (distance <= radiusKm) {
+          const q = query(
+            collection(db, 'book'),
+            where('isbn', '==', reading.isbn),
+            limit(1) 
+            );
+        const querySnapshot = await getDocs(q);
+
+          if (!querySnapshot.empty) {
+            const book = querySnapshot.docs[0].data();
+            
+            nearbyReadings.push({
+              isbn: reading.isbn,
+              title: book.title,
+              author: book.author,
+              publisher: book.publisher,
+              publishedDate: book.year, 
+              coverUrl: book.cover_url,
+              latitude: reading.latitude,
+              longitude: reading.longitude
+            });
+          }
+        }
+      } catch (e) {
+        console.error('Error processing reading:', e);
+      }
+    }
+    
+    return nearbyReadings;
+  } catch (error) {
+    console.error('Error fetching nearby readings:', error);
+    throw error;
+  }
+};
+
+function distanceInKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = deg2rad(lat2 - lat1);
+  const dLon = deg2rad(lon2 - lon1);
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+function deg2rad(deg) {
+  return deg * (Math.PI/180);
+}
 
   useEffect(() => {
     (async () => {
@@ -40,20 +113,14 @@ const MapContent = () => {
           longitudeDelta: 0.01
         });
         const token = await AsyncStorage.getItem('token');
-        let response = await fetch("http://nobody.home.ro:8080/api/reading/nearby?latitude="+ currentLocation.coords.latitude +
-           "&longitude="+currentLocation.coords.longitude +"&username=" + userEmail, {
-          method: 'GET',
-          headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-          }
-        });
-        if (response.ok) {
-          let data = await response.json(); 
-          setNearbyBooks(data);
-        } else {
-          console.error('Failed to fetch nearby readings:', response.status);
-        }
+
+    const nearbyReadings = await getNearbyReadings(
+      currentLocation.coords.latitude,
+      currentLocation.coords.longitude,
+      userEmail
+    );
+    
+    setNearbyBooks(nearbyReadings);
       } catch (error) {
         setErrorMsg('Error getting location');
         console.error(error);

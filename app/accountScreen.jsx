@@ -5,7 +5,6 @@ import { Ionicons } from '@expo/vector-icons';
 
 const AccountScreen = ({ navigation }) => {
   const [user, setUser] = useState({
-    name: '',
     email: ''
   });
 
@@ -13,11 +12,8 @@ const AccountScreen = ({ navigation }) => {
     const loadUserData = async () => {
       try {        
       const userEmail = await AsyncStorage.getItem('userEmail');
-      const userName = await AsyncStorage.getItem('userName');
-
-        if (userEmail && userName) {
+        if (userEmail) {
           setUser({
-            name: userName,
             email: userEmail
           });
         }
@@ -69,7 +65,6 @@ return (
         </View>
 
         <View style={styles.userInfo}>
-          <Text style={styles.userName}>{user.name}</Text>
           <Text style={styles.userEmail}>{user.email}</Text>
         </View>
       </View>

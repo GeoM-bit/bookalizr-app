@@ -3,6 +3,8 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image, Alert, Act
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { collection, getDocs, query, where, limit, updateDoc, deleteDoc } from 'firebase/firestore';
+import { db } from './firebaseConfig';
 
 const MyLibraryScreen = ({ navigation }) => {
   const [books, setBooks] = useState([]);
@@ -10,28 +12,53 @@ const MyLibraryScreen = ({ navigation }) => {
   const [selectedBook, setSelectedBook] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
 
-  const fetchBooks = async () => {
-    try {
-      const userEmail = await AsyncStorage.getItem('userEmail');
-      const token = await AsyncStorage.getItem('token');
-      if (userEmail) {
-        const response = await fetch('http://nobody.home.ro:8080/api/reading/user-books/' + userEmail, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }});
-        if (response.ok) {
-          let data = await response.json();
-          setBooks(data);
-        }
+const fetchBooks = async () => {
+  setLoading(true);
+  try {
+    const userEmail = await AsyncStorage.getItem('userEmail');
+    if (!userEmail) return;
+
+    const readingQuery = query(
+      collection(db, 'reading'),
+      where('username', '==', userEmail)
+    );
+    const readingSnapshot = await getDocs(readingQuery);
+
+    const readingDocs = readingSnapshot.docs.map(doc => doc.data());
+
+    const bookDetails = await Promise.all(readingDocs.map(async (reading) => {
+      const isbn = reading.isbn;
+
+      const bookQuery = query(
+        collection(db, 'book'),
+        where('isbn', '==', isbn),
+        limit(1)
+      );
+      const bookSnapshot = await getDocs(bookQuery);
+
+      if (!bookSnapshot.empty) {
+        const bookData = bookSnapshot.docs[0].data();
+        return {
+          isbn: bookData.isbn,
+          title: bookData.title,
+          author: bookData.author,
+          publisher: bookData.publisher,
+          year: bookData.year,
+          coverUrl: bookData.cover_url,
+          description: bookData.description,
+          isBeingRead: reading.current || false,
+        };
       }
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+
+      return null;
+    }));
+    setBooks(bookDetails.filter(book => book !== null));
+  } catch (error) {
+    console.error('Error fetching books from Firebase:', error);
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => {
     fetchBooks();
@@ -43,58 +70,64 @@ const MyLibraryScreen = ({ navigation }) => {
     }, [])
   );
 
-  const toggleReadingStatus = async (isbn) => {
-    try {
-      const userEmail = await AsyncStorage.getItem('userEmail');
-      const locationString = await AsyncStorage.getItem('location');
-      const location = JSON.parse(locationString);
-      const token = await AsyncStorage.getItem('token');
-      const response = await fetch(`http://nobody.home.ro:8080/api/reading/${userEmail}/${isbn}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          current: !selectedBook.isBeingRead,
-          latitude: location.latitude,
-          longitude: location.longitude
-        })
-      });
+const toggleReadingStatus = async (isbn) => {
+  try {
+    const userEmail = await AsyncStorage.getItem('userEmail');
+    if (!userEmail) return;
 
-      if (response.ok) {
-        setBooks(books.map(book => 
-          book.isbn === isbn 
-            ? { ...book, isBeingRead: !book.isBeingRead } 
-            : book
-        ));
-        setSelectedBook(prev => ({ ...prev, isBeingRead: !prev.isBeingRead }));
-      }
-    } catch (error) {
-      console.error('Error updating reading status:', error);
+    const readingQuery = query(
+      collection(db, 'reading'),
+      where('username', '==', userEmail),
+      where('isbn', '==', isbn)
+    );
+
+    const snapshot = await getDocs(readingQuery);
+
+    if (!snapshot.empty) {
+      const docRef = snapshot.docs[0].ref;
+      const isReadingStatus = snapshot.docs[0].data().isReading || false;
+
+      await updateDoc(docRef, { isReading: !isReadingStatus });
+
+      setBooks(books.map(book =>
+        book.isbn === isbn
+          ? { ...book, isReading: !isReadingStatus }
+          : book
+      ));
+      setSelectedBook(prev => ({ ...prev, isReading: !isReadingStatus }));
     }
-  };
+  } catch (error) {
+    console.error('Error toggling reading status in Firestore:', error);
+  }
+};
 
-  const deleteBook = async (isbn) => {
-    try {
-      const userEmail = await AsyncStorage.getItem('userEmail');
-      const token = await AsyncStorage.getItem('token');
-      const response = await fetch(`http://nobody.home.ro:8080/api/reading/${userEmail}/${isbn}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-      });
+const deleteBook = async (isbn) => {
+  try {
+    const userEmail = await AsyncStorage.getItem('userEmail');
+    if (!userEmail) return;
 
-      if (response.ok) {
-        setBooks(books.filter(book => book.isbn !== isbn));
-        setModalVisible(false);
-      }
-    } catch (error) {
-      console.error('Error deleting book:', error);
+    const readingQuery = query(
+      collection(db, 'reading'),
+      where('username', '==', userEmail),
+      where('isbn', '==', isbn)
+    );
+
+    const snapshot = await getDocs(readingQuery);
+
+    if (!snapshot.empty) {
+      const docRef = snapshot.docs[0].ref;
+
+      await deleteDoc(docRef);
+
+      setBooks(prevBooks => prevBooks.filter(book => book.isbn !== isbn));
+      setModalVisible(false);
+    } else {
+      console.warn('No matching reading document found to delete.');
     }
-  };
+  } catch (error) {
+    console.error('Error deleting book from Firebase:', error);
+  }
+};
 
   const showBookDetails = (book) => {
     setSelectedBook(book);
@@ -147,7 +180,7 @@ const MyLibraryScreen = ({ navigation }) => {
               <Text style={styles.author}>{book.author}</Text>
               <Text style={styles.details}>{book.publisher}, {book.year}</Text>
               <Text style={styles.readingStatus}>
-                Status: {book.isBeingRead ? 'Currently Reading' : 'Not Reading'}
+                Status: {book.isReading ? 'Currently Reading' : 'Not Reading'}
               </Text>
             </View>
           </TouchableOpacity>
@@ -179,12 +212,12 @@ const MyLibraryScreen = ({ navigation }) => {
                   <TouchableOpacity
                     style={[
                       styles.modalButton,
-                      selectedBook.isBeingRead ? styles.readingButton : styles.notReadingButton
+                      selectedBook.isReading ? styles.readingButton : styles.notReadingButton
                     ]}
                     onPress={() => toggleReadingStatus(selectedBook.isbn)}
                   >
                     <Text style={styles.modalButtonText}>
-                      {selectedBook.isBeingRead ? 'Mark as not Reading' : 'Mark as Reading'}
+                      {selectedBook.isReading ? 'Mark as not Reading' : 'Mark as Reading'}
                     </Text>
                   </TouchableOpacity>
                   
