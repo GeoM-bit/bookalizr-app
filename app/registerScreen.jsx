@@ -1,59 +1,34 @@
-import { View, Text, TextInput, Button, ScrollView, Alert, StyleSheet } from 'react-native';
+import { View, Text, TextInput, Button, ScrollView, StyleSheet, Alert } from 'react-native';
 import { useState } from 'react';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { auth } from './firebaseConfig';
 
 const RegisterScreen = ({ navigation }) => {
-  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const handleRegister = async () => {
-     const payload = {
-    name,
-    email,
-    password,
-  };
-        const response = await fetch('http://nobody.home.ro:8080/authentication/register', {
-          method: 'POST',
-          body: JSON.stringify(payload),
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
+const handleRegister = async () => {
+  try {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    console.log("User created:", userCredential.user.email);
+    navigation.navigate('Login', { registered: true });
+  } catch (error) {
+    console.error("Auth error:", error.code, error.message);
 
-    if(response.ok)
-    {
-      navigation.navigate('Login');
-      Alert.alert(
-        "Your account was saved!",
-        "You can now login.",
-        [
-          { text: "OK", onPress: () => console.log("OK Pressed") }
-        ]
-      );
-    }
-    else
-    {
-      Alert.alert(
-        "Something went wrong!",
-        "Your account could not be saved.",
-        [
-          { text: "OK", onPress: () => console.log("OK Pressed") }
-        ]
-      );
-    }
-  };
+    Alert.alert(
+      "Registration Error",
+      error.message,
+      [{ text: "OK" }],
+      { cancelable: true }
+    );
+  }
+};
 
   return (
     <ScrollView contentContainerStyle={Styles.container}>
       <Text style={Styles.heading}>Bookalizr App</Text>
       <View style={Styles.authContainer}>
         <Text style={Styles.title}>Sign Up</Text>
-        <TextInput
-          style={Styles.input}
-          value={name}
-          onChangeText={setName}
-          placeholder="Name"
-        />
         <TextInput
           style={Styles.input}
           value={email}

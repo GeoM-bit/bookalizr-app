@@ -1,52 +1,39 @@
-import { View, Text, TextInput, Button, ScrollView, Alert, StyleSheet } from 'react-native';
-import { useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { View, Text, TextInput, Button, ScrollView, StyleSheet, Alert } from 'react-native';
+import { useRoute } from '@react-navigation/native';
+import { useState, useEffect } from 'react';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from './firebaseConfig';
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const route = useRoute();
 
-  const handleLogin = async () => {
-   console.log(email)
-      const payload = {
-    email,
-    password
-  };
-        const response = await fetch('http://nobody.home.ro:8080/authentication/login', {
-          method: 'POST',
-          body: JSON.stringify(payload),
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-
-      const data = await response.json();
-      const token = data.token;
-      await AsyncStorage.setItem('token', token);
-    if(token)
-    {
-  const userResponse = await fetch('http://nobody.home.ro:8080/user/me', {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-  });
-
-  const userData = await userResponse.json();
-      await AsyncStorage.setItem('userEmail', userData.email);
-      await AsyncStorage.setItem('userName', userData.name);
-      navigation.navigate('Home');
-    }
-    else
-    {
+  useEffect(() => {
+    if (route.params?.registered) {
       Alert.alert(
-        "Something went wrong!",
-        "Login attempt failed.",
-        [
-          { text: "OK", onPress: () => console.log("OK Pressed") }
-        ]
+        "Success",
+        "Registration complete! You can now log in.",
+        [{ text: "OK" }],
+        { cancelable: true }
       );
+    }
+  }, []);
+  
+  const handleLogin = async () => {
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      console.log("User signed in:", userCredential.user.email); 
+      navigation.navigate('Home');
+    } catch (error) {
+      console.error("Auth error:", error.code, error.message); 
+      
+    Alert.alert(
+      "Login Error",
+      error.message,
+      [{ text: "OK" }],
+      { cancelable: true }
+    );
     }
   };
 
