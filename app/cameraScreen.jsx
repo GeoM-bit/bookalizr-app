@@ -44,7 +44,7 @@ const savePicture = async () => {
       name: 'photo.jpg',
     });
 
-    const response = await fetch('https://bookalizr-ocr-api.blackisland-e63ab678.germanywestcentral.azurecontainerapps.io/ocr/?engine=moondream', {
+    const response = await fetch('http://192.168.1.101:8000/ocr/?engine=moondream', {
       method: 'POST',
       body: formData,
       headers: {
@@ -54,7 +54,7 @@ const savePicture = async () => {
 
     const result = await response.json();
     const bookInfo = result?.search_result?.books?.[0];
-      const books = result?.search_result?.books;
+    const books = result?.search_result?.books;
     console.log(result);
 
     if (bookInfo) {

@@ -2,6 +2,10 @@ import { useState, useRef } from 'react';
 import { View, Text, TextInput, Button, Image, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+
+import { db, storage } from './firebaseConfig';
 
 const AddNewBookScreen = ({ navigation }) => {
   const [permission, requestPermission] = useCameraPermissions();
@@ -14,6 +18,7 @@ const AddNewBookScreen = ({ navigation }) => {
   const [year, setYear] = useState('');
   const [isbn, setIsbn] = useState('');
   const [publisher, setPublisher] = useState('');
+  const [description, setDescription] = useState('');
 
   const takePicture = async () => {
     if (cameraRef.current) {
@@ -31,84 +36,56 @@ const AddNewBookScreen = ({ navigation }) => {
     let coverUrl = '';
 
     if (imageUri) {
-      const formData = new FormData();
-      formData.append('file', {
-        uri: imageUri,
-        type: 'image/jpeg',
-        name: 'cover.jpg',
-      });
-
-      try {
-         const token = await AsyncStorage.getItem('token');
-        const response = await fetch('http://nobody.home.ro:8080/api/upload', {
-          method: 'POST',
-          body: formData,
-          headers: {
-            'Content-Type': 'multipart/form-data',
-             'Authorization': `Bearer ${token}`
-          },
-        });
-      if (!response.ok) {
-        throw new Error('Upload failed');
-      }
-
-      const result = await response.json(); 
-      coverUrl = result.imageUrl;
+       try {
+        const storageRef = ref(storage, `bookCovers/${Date.now()}.jpg`);       
+        const response = await fetch(imageUri);
+        const blob = await response.blob();       
+        await uploadBytes(storageRef, blob);        
+        coverUrl = await getDownloadURL(storageRef);
       } catch (err) {
         console.error('Image upload failed:', err);
         Alert.alert('Upload Error', 'Failed to upload image');
         return;
       }
     }
+     try {
+    const email = await AsyncStorage.getItem('userEmail');
+    const locationString = await AsyncStorage.getItem('location');
+    const location = JSON.parse(locationString);
 
     const bookToSave = {
       isbn,
       title,
       author,
       publisher,
-      publishedDate: year,
-      coverUrl,
+      year,
+      cover_url: coverUrl,
+      description
     };
 
-    try {
-       const token = await AsyncStorage.getItem('token');
-      const res = await fetch('http://nobody.home.ro:8080/api/book/register', {
-        method: 'POST',
-        body: JSON.stringify(bookToSave),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-      });
-      const email = await AsyncStorage.getItem('userEmail');
-      const locationString = await AsyncStorage.getItem('location');
-      const location = JSON.parse(locationString);
-      let readingToSave =
-      {
-        username: email,
-        isbn: isbn,
-        current: 0,
-        latitude: location.latitude,
-        longitude: location.longitude
-      };
+    const readingToSave = {
+      username: email,
+      isbn,
+      isReading: false,
+      latitude: location.latitude,
+      longitude: location.longitude,
+    };
 
-        const responseForSaveReading = await fetch('http://nobody.home.ro:8080/api/reading', {
-        method: 'POST',
-        body: JSON.stringify(readingToSave),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-          }
-      });   
-            if (res.ok && responseForSaveReading.ok) {
-        Alert.alert('Success', 'Book added to your library!');
-      navigation.navigate('MyLibrary');
-      } else {
-        Alert.alert('Error', 'Failed to save book');
-      }
-    } catch (err) {
-      console.error('Book save failed:', err);
+    const bookQuery = query(collection(db, 'book'), where('isbn', '==', isbn));
+    const bookSnapshot = await getDocs(bookQuery);
+
+    if (bookSnapshot.empty) {
+      await addDoc(collection(db, 'book'), bookToSave);
     }
+
+    await addDoc(collection(db, 'reading'), readingToSave);
+
+    alert(`Added "${title}" to library!`);
+    navigation.navigate('MyLibrary');
+  } catch (error) {
+    console.error('Error saving to Firebase:', error);
+    alert('Something went wrong while adding the book.');
+  }
   };
 
   if (!permission?.granted) {
@@ -150,6 +127,7 @@ const AddNewBookScreen = ({ navigation }) => {
       <TextInput style={styles.input} placeholder="Year:" value={year} onChangeText={setYear} keyboardType="numeric" />
       <TextInput style={styles.input} placeholder="ISBN:" value={isbn} onChangeText={setIsbn} />
       <TextInput style={styles.input} placeholder="Publisher:" value={publisher} onChangeText={setPublisher} />
+      <TextInput style={styles.input} placeholder="Description:" value={description} onChangeText={setDescription} />
 
       <Button title="Add to library" onPress={handleAddBook} color="black" />
     </View>

@@ -23,7 +23,7 @@ const getNearbyReadings = async (latitude, longitude, username) => {
     const readingsQuery = query(
       collection(db, 'reading'),
       where('isReading', '==', true),
-      //where('username', '!=', username)
+      where('username', '!=', username)
     );
     
     const readingsSnapshot = await getDocs(readingsQuery);

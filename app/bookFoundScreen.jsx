@@ -1,62 +1,57 @@
 import { View, Text, StyleSheet, Image, Button, ScrollView } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { collection, addDoc, getDocs, query, where, doc, setDoc } from 'firebase/firestore';
+import { db } from './firebaseConfig';
 
 const BookFoundScreen = ({ route, navigation }) => {
   const { book } = route.params;
   const isbn = book.identifiers.find(id => id.type === 'ISBN_13')?.identifier;
   const description = book.description.slice(0,250);
 
-  const handleAddToLibrary = async ()  => {
-      let bookToSave =
-      {
-        isbn: isbn,
-        title: book.title,
-        author: book.authors.join(', '),
-        publisher: book.publisher,
-        publishedDate: book.published_date?.slice(0, 4) ?? "2000",
-        coverUrl: book.images?.thumbnail,
-        description: description
-      };
-      const email = await AsyncStorage.getItem('userEmail');
-      const locationString = await AsyncStorage.getItem('location')
-      const token = await AsyncStorage.getItem('token');
-      const location = JSON.parse(locationString);
-      let readingToSave =
-      {
-        username: email,
-        isbn: isbn,
-        current: 0,
-        latitude: location.latitude,
-        longitude: location.longitude
-      };
-      const responseForSaveBook = await fetch('http://nobody.home.ro:8080/api/book/register', {
-        method: 'POST',
-        body: JSON.stringify(bookToSave),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-          }
-      });
+const handleAddToLibrary = async () => {
+  try {
+    const email = await AsyncStorage.getItem('userEmail');
+    const locationString = await AsyncStorage.getItem('location');
+    const location = JSON.parse(locationString);
 
-      const responseForSaveReading = await fetch('http://nobody.home.ro:8080/api/reading', {
-        method: 'POST',
-        body: JSON.stringify(readingToSave),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-          }
-      });    
-  
-      if(responseForSaveBook.ok && responseForSaveReading.ok)
-      {
-        navigation.navigate('MyLibrary');
-        alert(`Added "${book.title}" to library!`);
-      }
-      else
-      {
-      alert(`Something went wrong!`);
-      }
-  };
+    const isbn = book.identifiers.find(id => id.type === 'ISBN_13')?.identifier;
+    const description = book.description.slice(0, 250);
+
+    const bookToSave = {
+      isbn,
+      title: book.title,
+      author: book.authors.join(', '),
+      publisher: book.publisher,
+      publishedDate: book.published_date?.slice(0, 4) ?? "2000",
+      cover_url: book.images?.thumbnail,
+      description,
+    };
+
+    const readingToSave = {
+      username: email,
+      isbn,
+      isReading: false,
+      latitude: location.latitude,
+      longitude: location.longitude,
+    };
+
+    const bookQuery = query(collection(db, 'book'), where('isbn', '==', isbn));
+    const bookSnapshot = await getDocs(bookQuery);
+
+    if (bookSnapshot.empty) {
+      await addDoc(collection(db, 'book'), bookToSave);
+    }
+
+    await addDoc(collection(db, 'reading'), readingToSave);
+
+    alert(`Added "${book.title}" to library!`);
+    navigation.navigate('MyLibrary');
+  } catch (error) {
+    console.error('Error saving to Firebase:', error);
+    alert('Something went wrong while adding the book.');
+  }
+};
+
 
   return (
   <ScrollView contentContainerStyle={styles.scrollContent}>

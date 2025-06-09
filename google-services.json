@@ -1,6 +1,7 @@
 {
   "project_info": {
     "project_number": "616798399540",
+    "firebase_url": "https://bookalizr-d7391-default-rtdb.firebaseio.com",
     "project_id": "bookalizr-d7391",
     "storage_bucket": "bookalizr-d7391.firebasestorage.app"
   },
