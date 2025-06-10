@@ -112,7 +112,7 @@ const MapContent = ({navigation}) => {
       case 'reading':
         return { text: 'Currently Reading', color: 'black', canBorrow: false };
       case 'toLend':
-        return { text: 'Available to Borrow', color: 'green', canBorrow: true };
+        return { text: 'Available to Borrow', color: 'black', canBorrow: true };
       default:
         return { text: 'Unknown Status', color: '#9E9E9E', canBorrow: false };
     }
@@ -321,7 +321,6 @@ const styles = StyleSheet.create({
   tabContainer: {
     flex: 1,
     backgroundColor: 'white',
-    padding: 16,
   },
   mapContainer: {
     flex: 1,
@@ -418,7 +417,7 @@ const styles = StyleSheet.create({
   chatButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'green',
+    backgroundColor: 'black',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,

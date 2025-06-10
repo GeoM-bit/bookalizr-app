@@ -1,4 +1,4 @@
-import { View, Text, TextInput, Button, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, Button, ScrollView, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { useState } from 'react';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from './firebaseConfig';
@@ -6,8 +6,10 @@ import { auth } from './firebaseConfig';
 const RegisterScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
 const handleRegister = async () => {
+  setIsLoading(true);
   try {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     console.log("User created:", userCredential.user.email);
@@ -21,6 +23,8 @@ const handleRegister = async () => {
       [{ text: "OK" }],
       { cancelable: true }
     );
+  } finally {
+    setIsLoading(false);
   }
 };
 
@@ -42,9 +46,16 @@ const handleRegister = async () => {
           onChangeText={setPassword}
           placeholder="Password"
           secureTextEntry
-        />
+        /> 
         <View style={Styles.buttonContainer}>
-          <Button title="Sign Up" onPress={handleRegister} color="black" />
+          {isLoading ? (
+            <View style={Styles.spinnerContainer}>
+              <ActivityIndicator size="large" color="#007AFF" />
+              <Text style={Styles.loadingText}>Creating your account...</Text>
+            </View>
+          ) : (
+            <Button title="Sign Up" onPress={handleRegister} color="black" disabled={isLoading} />
+          )}
         </View>
         <View style={Styles.bottomContainer}>
           <Text style={Styles.toggleText} onPress={() => navigation.navigate('Login')}>
@@ -101,10 +112,19 @@ const Styles = StyleSheet.create({
   },
   bottomContainer: {
     marginTop: 20,
-  },
-  emailText: {
+  },  emailText: {
     fontSize: 18,
     textAlign: 'center',
     marginBottom: 20,
+  },
+  spinnerContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16
+  },
+  loadingText: {
+    color: '#555',
+    fontSize: 14,
+    marginTop: 10
   }
 });

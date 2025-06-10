@@ -274,7 +274,6 @@ const deleteBook = async (isbn) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
     backgroundColor: '#fff',
   },
    header: {

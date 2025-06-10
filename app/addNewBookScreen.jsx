@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { View, Text, TextInput, Button, Image, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, TextInput, Button, Image, StyleSheet, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, ActivityIndicator } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
@@ -12,13 +12,13 @@ const AddNewBookScreen = ({ navigation }) => {
   const cameraRef = useRef(null);
   const [isCameraVisible, setIsCameraVisible] = useState(false);
   const [imageUri, setImageUri] = useState(null);
-
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
   const [year, setYear] = useState('');
   const [isbn, setIsbn] = useState('');
   const [publisher, setPublisher] = useState('');
   const [description, setDescription] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const takePicture = async () => {
     if (cameraRef.current) {
@@ -31,8 +31,8 @@ const AddNewBookScreen = ({ navigation }) => {
       }
     }
   };
-
   const handleAddBook = async () => {
+    setIsLoading(true); 
     let coverUrl = '';
 
     if (imageUri) {
@@ -45,6 +45,7 @@ const AddNewBookScreen = ({ navigation }) => {
       } catch (err) {
         console.error('Image upload failed:', err);
         Alert.alert('Upload Error', 'Failed to upload image');
+        setIsLoading(false); 
         return;
       }
     }
@@ -76,15 +77,15 @@ const AddNewBookScreen = ({ navigation }) => {
 
     if (bookSnapshot.empty) {
       await addDoc(collection(db, 'book'), bookToSave);
-    }
-
-    await addDoc(collection(db, 'reading'), readingToSave);
+    }    await addDoc(collection(db, 'reading'), readingToSave);
 
     alert(`Added "${title}" to library!`);
+    setIsLoading(false);
     navigation.navigate('MyLibrary');
   } catch (error) {
     console.error('Error saving to Firebase:', error);
     alert('Something went wrong while adding the book.');
+    setIsLoading(false); 
   }
   };
 
@@ -106,31 +107,61 @@ const AddNewBookScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
       </CameraView>
-    );
-  }
+    ); 
+   }
+    return (
+    <KeyboardAvoidingView 
+      behavior="padding"
+      style={{flex: 1}}
+      keyboardVerticalOffset={30}
+    >
+      {isLoading && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#000" />
+          <Text style={styles.loadingText}>Adding book to library...</Text>
+        </View>
+      )}
+      <ScrollView 
+        style={styles.container}
+        keyboardShouldPersistTaps="always"
+        keyboardDismissMode="interactive"
+        showsVerticalScrollIndicator={true}
+        contentContainerStyle={{paddingBottom: 250}}
+      >
+        <Text style={styles.heading}>Add new book</Text>
+        <Text style={styles.message}>Fill in the book details and take a photo of the cover.</Text>
 
-  return (
-    <View style={styles.container}>
-      <Text style={styles.heading}>Add new book</Text>
-      <Text style={styles.message}>Fill in the book details and take a photo of the cover.</Text>
+        <TouchableOpacity onPress={() => setIsCameraVisible(true)} style={styles.imageUploadBox}>
+          {imageUri ? (
+            <Image source={{ uri: imageUri }} style={styles.coverImage} />
+          ) : (
+            <Text style={styles.uploadText}>+ Take photo</Text>
+          )}
+        </TouchableOpacity>
 
-      <TouchableOpacity onPress={() => setIsCameraVisible(true)} style={styles.imageUploadBox}>
-        {imageUri ? (
-          <Image source={{ uri: imageUri }} style={styles.coverImage} />
-        ) : (
-          <Text style={styles.uploadText}>+ Take photo</Text>
-        )}
-      </TouchableOpacity>
-
-      <TextInput style={styles.input} placeholder="Title:" value={title} onChangeText={setTitle} />
-      <TextInput style={styles.input} placeholder="Author:" value={author} onChangeText={setAuthor} />
-      <TextInput style={styles.input} placeholder="Year:" value={year} onChangeText={setYear} keyboardType="numeric" />
-      <TextInput style={styles.input} placeholder="ISBN:" value={isbn} onChangeText={setIsbn} />
-      <TextInput style={styles.input} placeholder="Publisher:" value={publisher} onChangeText={setPublisher} />
-      <TextInput style={styles.input} placeholder="Description:" value={description} onChangeText={setDescription} />
-
-      <Button title="Add to library" onPress={handleAddBook} color="black" />
-    </View>
+        <TextInput style={styles.input} placeholder="Title:" value={title} onChangeText={setTitle} />
+        <TextInput style={styles.input} placeholder="Author:" value={author} onChangeText={setAuthor} />
+        <TextInput style={styles.input} placeholder="Year:" value={year} onChangeText={setYear} keyboardType="numeric" />
+        <TextInput style={styles.input} placeholder="ISBN:" value={isbn} onChangeText={setIsbn} />  
+        <TextInput 
+          style={styles.input} 
+          placeholder="Publisher:" 
+          value={publisher} 
+          onChangeText={setPublisher} 
+        />
+        
+        <TextInput 
+          style={styles.descriptionInput} 
+          placeholder="Description:" 
+          value={description} 
+          onChangeText={setDescription}
+          multiline={true}
+          numberOfLines={5}
+          textAlignVertical="top"
+        />
+        <Button title="Add to library" onPress={handleAddBook} color="black" />        
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -138,6 +169,22 @@ export default AddNewBookScreen;
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, backgroundColor: '#fff' },
+  loadingOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    zIndex: 1000,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    fontWeight: '500',
+  },
   heading: { fontSize: 20, fontWeight: '600', marginBottom: 10 },
   message: { marginBottom: 20 },
   imageUploadBox: {
@@ -153,14 +200,23 @@ const styles = StyleSheet.create({
   coverImage: { 
     width: 70,  
     height: 90, 
-    borderRadius: 4
-  },
+    borderRadius: 4  },
   input: {
     borderWidth: 1,
     borderColor: '#000',
     borderRadius: 8,
     padding: 8,
     marginBottom: 13,
+  },
+  descriptionInput: {
+    borderWidth: 1,
+    borderColor: '#000',
+    borderRadius: 8,
+    padding: 10,
+    paddingTop: 10,
+    marginBottom: 20,
+    height: 120,
+    textAlignVertical: 'top',
   },
   camera: {
     flex: 1,

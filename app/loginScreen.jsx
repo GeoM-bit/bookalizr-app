@@ -1,4 +1,4 @@
-import { View, Text, TextInput, Button, ScrollView, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, Button, ScrollView, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import { useState, useEffect } from 'react';
 import { signInWithEmailAndPassword } from 'firebase/auth';
@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const route = useRoute();
 
   useEffect(() => {
@@ -20,8 +21,8 @@ const LoginScreen = ({ navigation }) => {
       );
     }
   }, []);
-
   const handleLogin = async () => {
+    setIsLoading(true);
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       console.log("User signed in:", userCredential.user.email); 
@@ -30,12 +31,14 @@ const LoginScreen = ({ navigation }) => {
     } catch (error) {
       console.error("Auth error:", error.code, error.message); 
       
-    Alert.alert(
-      "Login Error",
-      error.message,
-      [{ text: "OK" }],
-      { cancelable: true }
-    );
+      Alert.alert(
+        "Login Error",
+        error.message,
+        [{ text: "OK" }],
+        { cancelable: true }
+      );
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -57,9 +60,16 @@ const LoginScreen = ({ navigation }) => {
           onChangeText={setPassword}
           placeholder="Password"
           secureTextEntry
-        />
+        /> 
         <View style={Styles.buttonContainer}>
-          <Button title="Log In" onPress={handleLogin} color="black" />
+          {isLoading ? (
+            <View style={Styles.spinnerContainer}>
+              <ActivityIndicator size="large" color="#007AFF" />
+              <Text style={Styles.loadingText}>Signing in...</Text>
+            </View>
+          ) : (
+            <Button title="Log In" onPress={handleLogin} color="black" disabled={isLoading} />
+          )}
         </View>       
         <View style={Styles.bottomContainer}>
           <Text style={Styles.toggleText} onPress={() => navigation.navigate('Register')}>
@@ -113,8 +123,17 @@ const Styles = StyleSheet.create({
   },
   bottomContainer: {
     marginTop: 20,
-  },
-  toggleText: {
+  },  toggleText: {
     textAlign: 'center',
+  },
+  spinnerContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16
+  },
+  loadingText: {
+    color: '#555',
+    fontSize: 14,
+    marginTop: 10
   }
 });
