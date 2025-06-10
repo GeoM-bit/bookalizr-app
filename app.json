@@ -2,6 +2,7 @@
   "expo": {
     "scheme": "bookalizrmobileuiapp",
     "name": "bookalizr-mobile-ui",
+    "owner": "matei.georgiana11",
     "slug": "bookalizr-mobile-ui",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -22,6 +23,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.outofoffice.bookalizr",
+      "googleServicesFile": "./google-services.json",
       "permissions": [
         "ACCESS_FINE_LOCATION"
       ]
@@ -31,7 +33,9 @@
     },
     "plugins": [
       "expo-router",
-      "expo-build-properties"
+      "expo-build-properties",
+      "expo-web-browser",
+      "@react-native-google-signin/google-signin"
     ],
     "extra": {
       "router": {},

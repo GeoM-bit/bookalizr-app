@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+import BottomNav from './bottomNav';
 
 const AccountScreen = ({ navigation }) => {
   const [user, setUser] = useState({
-    name: '',
     email: ''
   });
 
@@ -13,11 +13,8 @@ const AccountScreen = ({ navigation }) => {
     const loadUserData = async () => {
       try {        
       const userEmail = await AsyncStorage.getItem('userEmail');
-      const userName = await AsyncStorage.getItem('userName');
-
-        if (userEmail && userName) {
+        if (userEmail) {
           setUser({
-            name: userName,
             email: userEmail
           });
         }
@@ -69,7 +66,6 @@ return (
         </View>
 
         <View style={styles.userInfo}>
-          <Text style={styles.userName}>{user.name}</Text>
           <Text style={styles.userEmail}>{user.email}</Text>
         </View>
       </View>
@@ -78,36 +74,7 @@ return (
         <Text style={styles.logoutButtonText}>Log Out</Text>
       </TouchableOpacity>
     </View>
-    
-    <View style={styles.bottomNav}>
-      <TouchableOpacity 
-        style={styles.navIcon}
-        onPress={() => navigation.navigate('Home')}
-      >
-        <Ionicons name="home-outline" size={28} color="#333" />
-      </TouchableOpacity>
-      
-      <TouchableOpacity 
-        style={styles.navIcon}
-        onPress={() => navigation.navigate('Camera')}
-      >
-        <Ionicons name="camera-outline" size={28} color="#333" />
-      </TouchableOpacity>
-      
-      <TouchableOpacity 
-        style={styles.navIcon}
-        onPress={() => navigation.navigate('MyLibrary')}
-      >
-        <Ionicons name="book-outline" size={28} color="#333" />
-      </TouchableOpacity>
-
-      <TouchableOpacity 
-        style={styles.navIcon}
-        onPress={() => navigation.navigate('Account')}
-      >
-        <Ionicons name="person-outline" size={28} color="#333" />
-      </TouchableOpacity>
-    </View>
+    <BottomNav navigation={navigation}></BottomNav>
   </View>
 );
 };
@@ -184,9 +151,9 @@ const styles = StyleSheet.create({
   },
   logoutButton: {
     backgroundColor: '#ff4444',
-    padding: 16,
+    padding: 12,
     borderRadius: 10,
-    marginHorizontal: 20,
+    marginHorizontal: 28,
     alignItems: 'center',
     justifyContent: 'center',
   },

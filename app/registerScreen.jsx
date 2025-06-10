@@ -1,59 +1,38 @@
-import { View, Text, TextInput, Button, ScrollView, Alert, StyleSheet } from 'react-native';
+import { View, Text, TextInput, Button, ScrollView, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { useState } from 'react';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { auth } from './firebaseConfig';
 
 const RegisterScreen = ({ navigation }) => {
-  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleRegister = async () => {
-     const payload = {
-    name,
-    email,
-    password,
-  };
-        const response = await fetch('http://nobody.home.ro:8080/authentication/register', {
-          method: 'POST',
-          body: JSON.stringify(payload),
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
+const handleRegister = async () => {
+  setIsLoading(true);
+  try {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    console.log("User created:", userCredential.user.email);
+    navigation.navigate('Login', { registered: true });
+  } catch (error) {
+    console.error("Auth error:", error.code, error.message);
 
-    if(response.ok)
-    {
-      navigation.navigate('Login');
-      Alert.alert(
-        "Your account was saved!",
-        "You can now login.",
-        [
-          { text: "OK", onPress: () => console.log("OK Pressed") }
-        ]
-      );
-    }
-    else
-    {
-      Alert.alert(
-        "Something went wrong!",
-        "Your account could not be saved.",
-        [
-          { text: "OK", onPress: () => console.log("OK Pressed") }
-        ]
-      );
-    }
-  };
+    Alert.alert(
+      "Registration Error",
+      error.message,
+      [{ text: "OK" }],
+      { cancelable: true }
+    );
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   return (
     <ScrollView contentContainerStyle={Styles.container}>
       <Text style={Styles.heading}>Bookalizr App</Text>
       <View style={Styles.authContainer}>
         <Text style={Styles.title}>Sign Up</Text>
-        <TextInput
-          style={Styles.input}
-          value={name}
-          onChangeText={setName}
-          placeholder="Name"
-        />
         <TextInput
           style={Styles.input}
           value={email}
@@ -67,9 +46,16 @@ const RegisterScreen = ({ navigation }) => {
           onChangeText={setPassword}
           placeholder="Password"
           secureTextEntry
-        />
+        /> 
         <View style={Styles.buttonContainer}>
-          <Button title="Sign Up" onPress={handleRegister} color="black" />
+          {isLoading ? (
+            <View style={Styles.spinnerContainer}>
+              <ActivityIndicator size="large" color="#007AFF" />
+              <Text style={Styles.loadingText}>Creating your account...</Text>
+            </View>
+          ) : (
+            <Button title="Sign Up" onPress={handleRegister} color="black" disabled={isLoading} />
+          )}
         </View>
         <View style={Styles.bottomContainer}>
           <Text style={Styles.toggleText} onPress={() => navigation.navigate('Login')}>
@@ -126,10 +112,19 @@ const Styles = StyleSheet.create({
   },
   bottomContainer: {
     marginTop: 20,
-  },
-  emailText: {
+  },  emailText: {
     fontSize: 18,
     textAlign: 'center',
     marginBottom: 20,
+  },
+  spinnerContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16
+  },
+  loadingText: {
+    color: '#555',
+    fontSize: 14,
+    marginTop: 10
   }
 });
