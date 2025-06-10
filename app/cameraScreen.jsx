@@ -44,7 +44,7 @@ const savePicture = async () => {
       name: 'photo.jpg',
     });
 
-    const response = await fetch('http://192.168.1.101:8000/ocr/?engine=moondream', {
+    const response = await fetch('http://192.168.1.100:8000/ocr/?engine=moondream', {
       method: 'POST',
       body: formData,
       headers: {

@@ -30,7 +30,7 @@ const handleAddToLibrary = async () => {
     const readingToSave = {
       username: email,
       isbn,
-      isReading: false,
+      status: 'notReading',
       latitude: location.latitude,
       longitude: location.longitude,
     };

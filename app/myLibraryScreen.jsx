@@ -3,8 +3,10 @@ import { View, Text, TouchableOpacity, ScrollView, StyleSheet, Image, Alert, Act
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { collection, getDocs, query, where, limit, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where, limit, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from './firebaseConfig';
+import { Picker } from '@react-native-picker/picker';
+import BottomNav from './bottomNav';
 
 const MyLibraryScreen = ({ navigation }) => {
   const [books, setBooks] = useState([]);
@@ -46,7 +48,7 @@ const fetchBooks = async () => {
           year: bookData.year,
           coverUrl: bookData.cover_url,
           description: bookData.description,
-          isBeingRead: reading.current || false,
+          status: reading.status,
         };
       }
 
@@ -70,34 +72,39 @@ const fetchBooks = async () => {
     }, [])
   );
 
-const toggleReadingStatus = async (isbn) => {
+const updateStatus = async (newStatus) => {
   try {
     const userEmail = await AsyncStorage.getItem('userEmail');
-    if (!userEmail) return;
+    if (!userEmail || !selectedBook) {
+      console.error('Missing user email or selected book');
+      return;
+    }
 
     const readingQuery = query(
       collection(db, 'reading'),
       where('username', '==', userEmail),
-      where('isbn', '==', isbn)
+      where('isbn', '==', selectedBook.isbn)
     );
-
+    
     const snapshot = await getDocs(readingQuery);
-
+    
     if (!snapshot.empty) {
       const docRef = snapshot.docs[0].ref;
-      const isReadingStatus = snapshot.docs[0].data().isReading || false;
-
-      await updateDoc(docRef, { isReading: !isReadingStatus });
-
+      await updateDoc(docRef, { status: newStatus });
+      
       setBooks(books.map(book =>
-        book.isbn === isbn
-          ? { ...book, isReading: !isReadingStatus }
+        book.isbn === selectedBook.isbn
+          ? { ...book, status: newStatus }
           : book
       ));
-      setSelectedBook(prev => ({ ...prev, isReading: !isReadingStatus }));
+      setSelectedBook(prev => ({ ...prev, status: newStatus }));
+    } else {
+      console.warn('No matching reading document found to update.');
+      Alert.alert('Error', 'Could not find the book record to update');
     }
   } catch (error) {
-    console.error('Error toggling reading status in Firestore:', error);
+    console.error('Error updating status in Firestore:', error);
+    Alert.alert('Error', 'Failed to update book status');
   }
 };
 
@@ -174,13 +181,15 @@ const deleteBook = async (isbn) => {
               style={styles.coverImage}
               resizeMode="contain"
             />
-            
-            <View style={styles.bookInfo}>
+              <View style={styles.bookInfo}>
               <Text style={styles.title}>{book.title}</Text>
               <Text style={styles.author}>{book.author}</Text>
               <Text style={styles.details}>{book.publisher}, {book.year}</Text>
               <Text style={styles.readingStatus}>
-                Status: {book.isReading ? 'Currently Reading' : 'Not Reading'}
+                Status: {book.status === 'reading' ? 'Currently Reading' : 
+                        book.status === 'notReading' ? 'Not Reading' : 
+                        book.status === 'toLend' ? 'Available to Lend' : 
+                        book.status === 'lent' ? 'Lent Out' : book.status}
               </Text>
             </View>
           </TouchableOpacity>
@@ -209,18 +218,19 @@ const deleteBook = async (isbn) => {
                 <Text style={styles.modalDescription}>{selectedBook.description}</Text>
                 
                 <View style={styles.modalButtons}>
-                  <TouchableOpacity
-                    style={[
-                      styles.modalButton,
-                      selectedBook.isReading ? styles.readingButton : styles.notReadingButton
-                    ]}
-                    onPress={() => toggleReadingStatus(selectedBook.isbn)}
-                  >
-                    <Text style={styles.modalButtonText}>
-                      {selectedBook.isReading ? 'Mark as not Reading' : 'Mark as Reading'}
-                    </Text>
-                  </TouchableOpacity>
-                  
+  <View style={styles.pickerContainer}>
+    <Picker
+      selectedValue={selectedBook.status}
+      onValueChange={(itemValue) => updateStatus(itemValue)}
+      style={styles.picker}
+      dropdownIconColor="#333"
+    >
+      <Picker.Item label="Currently Reading" value="reading" />
+      <Picker.Item label="Not Reading" value="notReading" />
+      <Picker.Item label="Available to Lend" value="toLend" />
+      <Picker.Item label="Lent Out" value="lent" />
+    </Picker>
+  </View>             
                   <TouchableOpacity
                     style={styles.deleteButton}
                     onPress={() => Alert.alert(
@@ -256,35 +266,7 @@ const deleteBook = async (isbn) => {
       </Modal>
       </> 
       )}
-       <View style={styles.bottomNav}>
-        <TouchableOpacity 
-          style={styles.navIcon}
-          onPress={() => navigation.navigate('Home')}
-        >
-          <Ionicons name="home-outline" size={28} color="#333" />
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.navIcon}
-          onPress={() => navigation.navigate('Camera')}
-        >
-          <Ionicons name="camera-outline" size={28} color="#333" />
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.navIcon}
-          onPress={() => navigation.navigate('MyLibrary')}
-        >
-          <Ionicons name="book-outline" size={28} color="#333" />
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={styles.navIcon}
-          onPress={() => navigation.navigate('Account')}
-        >
-          <Ionicons name="person-outline" size={28} color="#333" />
-        </TouchableOpacity>
-      </View>
+       <BottomNav navigation={navigation}></BottomNav>
     </View>
   );
 };
@@ -371,7 +353,7 @@ const styles = StyleSheet.create({
   },
   modalCoverImage: {
     width: '100%',
-    height: 200,
+    height: 150,
     borderRadius: 4,
     marginBottom: 16,
     alignSelf: 'center',
@@ -400,7 +382,7 @@ const styles = StyleSheet.create({
     textAlign: 'justify',
   },
   modalButtons: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     justifyContent: 'space-between',
     marginBottom: 16,
   },
@@ -428,12 +410,10 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 5,
     backgroundColor: '#ff4444',
-    flex: 1,
     marginHorizontal: 5,
     textAlign: 'center'
 },
   deleteButtonText: {
-    fontSize: 13,
     color: 'white',
     fontWeight: 'bold',
     textAlign: 'center'
@@ -442,6 +422,7 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 5,
     backgroundColor: 'black',
+    marginHorizontal: 5,
     alignItems: 'center',
   },
   closeButtonText: {
@@ -471,6 +452,18 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#ddd',
   },
+  pickerContainer: {
+  borderWidth: 1,
+  borderColor: '#ddd',
+  borderRadius: 5,
+  marginBottom: 15,
+  overflow: 'hidden',
+  marginHorizontal: 5,
+},
+picker: {
+  width: '100%',
+  backgroundColor: '#f9f9f9',
+}
 });
 
 export default MyLibraryScreen;
